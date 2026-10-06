@@ -1,0 +1,507 @@
+//@version=5
+strategy("Super Scalping Fixed SLTP", overlay=true, margin_long=1, margin_short=1, pyramiding=0, initial_capital=1000, commission_type=strategy.commission.percent, commission_value=0.04)
+
+// =====================
+// CAPITAL / POSITION SIZE
+// =====================
+initialCapital = input.float(1000.0, "Initial Capital (USD)", minval=100.0, step=50.0, group="Capital")
+contractSize = input.float(1.0, "Contract Size / Quantity", minval=0.01, step=0.01, group="Capital")
+leverage = input.float(1.0, "Leverage Multiplier", minval=0.01, maxval=100.0, step=0.01, group="Capital")
+
+// =====================
+// HEIKEN ASHI
+// =====================
+isHA = input.bool(true, "Show Heiken Ashi Candles", group="Heiken Ashi")
+useHAforPivot = input.bool(true, "Use Heiken Ashi for Pivot Calculation", group="Heiken Ashi")
+heikenashi_1 = ticker.heikinashi(syminfo.tickerid)
+data = useHAforPivot ? heikenashi_1 : syminfo.tickerid
+o = request.security(data, timeframe.period, open)
+h = request.security(data, timeframe.period, high)
+l = request.security(data, timeframe.period, low)
+c = request.security(data, timeframe.period, close)
+col = c > o ? color.new(color.green, 0) : color.new(color.red, 0)
+plotcandle(isHA ? o : na, isHA ? h : na, isHA ? l : na, isHA ? c : na, "Heiken Ashi", col, color.black)
+
+// =====================
+// PIVOT INPUTS
+// =====================
+pivot_length_t3 = input.int(1, "Pivot Length T3", minval=0, group="Pivot Settings")
+pivot_length_t9 = input.int(1, "Pivot Length T9", minval=0, group="Pivot Settings")
+pivot_length_t12 = input.int(1, "Pivot Length T12", minval=0, group="Pivot Settings")
+pivot_length_t24 = input.int(1, "Pivot Length T24", minval=0, group="Pivot Settings")
+pivot_length_t36 = input.int(1, "Pivot Length T36", minval=0, group="Pivot Settings")
+pivot_length_t72 = input.int(1, "Pivot Length T72", minval=0, group="Pivot Settings")
+pivot_period = input.string("T72", "Pivot Period for Buy/Sell Condition", options=["T3", "T9", "T12", "T24", "T36", "T72"], group="Pivot Settings")
+
+show_pivot_high_t3 = input.bool(true, "Show Pivot High T3", group="Pivot Settings")
+show_pivot_low_t3 = input.bool(true, "Show Pivot Low T3", group="Pivot Settings")
+use_pivot_high_t3 = input.bool(true, "Use Pivot High T3 for Trading", group="Pivot Settings")
+use_pivot_low_t3 = input.bool(true, "Use Pivot Low T3 for Trading", group="Pivot Settings")
+color_pivot_high_t3 = input.color(color.new(color.yellow, 0), "Pivot High T3 Color", group="Pivot Settings")
+color_pivot_low_t3 = input.color(color.new(color.lime, 0), "Pivot Low T3 Color", group="Pivot Settings")
+
+show_pivot_high_t9 = input.bool(false, "Show Pivot High T9", group="Pivot Settings")
+show_pivot_low_t9 = input.bool(false, "Show Pivot Low T9", group="Pivot Settings")
+use_pivot_high_t9 = input.bool(false, "Use Pivot High T9 for Trading", group="Pivot Settings")
+use_pivot_low_t9 = input.bool(false, "Use Pivot Low T9 for Trading", group="Pivot Settings")
+color_pivot_high_t9 = input.color(color.new(color.yellow, 60), "Pivot High T9 Color", group="Pivot Settings")
+color_pivot_low_t9 = input.color(color.new(color.lime, 60), "Pivot Low T9 Color", group="Pivot Settings")
+
+show_pivot_high_t12 = input.bool(false, "Show Pivot High T12", group="Pivot Settings")
+show_pivot_low_t12 = input.bool(false, "Show Pivot Low T12", group="Pivot Settings")
+use_pivot_high_t12 = input.bool(false, "Use Pivot High T12 for Trading", group="Pivot Settings")
+use_pivot_low_t12 = input.bool(false, "Use Pivot Low T12 for Trading", group="Pivot Settings")
+color_pivot_high_t12 = input.color(color.new(color.yellow, 60), "Pivot High T12 Color", group="Pivot Settings")
+color_pivot_low_t12 = input.color(color.new(color.lime, 60), "Pivot Low T12 Color", group="Pivot Settings")
+
+show_pivot_high_t24 = input.bool(true, "Show Pivot High T24", group="Pivot Settings")
+show_pivot_low_t24 = input.bool(true, "Show Pivot Low T24", group="Pivot Settings")
+use_pivot_high_t24 = input.bool(true, "Use Pivot High T24 for Trading", group="Pivot Settings")
+use_pivot_low_t24 = input.bool(true, "Use Pivot Low T24 for Trading", group="Pivot Settings")
+color_pivot_high_t24 = input.color(color.new(color.yellow, 60), "Pivot High T24 Color", group="Pivot Settings")
+color_pivot_low_t24 = input.color(color.new(color.lime, 60), "Pivot Low T24 Color", group="Pivot Settings")
+
+show_pivot_high_t36 = input.bool(true, "Show Pivot High T36", group="Pivot Settings")
+show_pivot_low_t36 = input.bool(true, "Show Pivot Low T36", group="Pivot Settings")
+use_pivot_high_t36 = input.bool(true, "Use Pivot High T36 for Trading", group="Pivot Settings")
+use_pivot_low_t36 = input.bool(true, "Use Pivot Low T36 for Trading", group="Pivot Settings")
+color_pivot_high_t36 = input.color(color.new(color.yellow, 60), "Pivot High T36 Color", group="Pivot Settings")
+color_pivot_low_t36 = input.color(color.new(color.lime, 60), "Pivot Low T36 Color", group="Pivot Settings")
+
+show_pivot_high_t72 = input.bool(true, "Show Pivot High T72", group="Pivot Settings")
+show_pivot_low_t72 = input.bool(true, "Show Pivot Low T72", group="Pivot Settings")
+use_pivot_high_t72 = input.bool(true, "Use Pivot High T72 for Trading", group="Pivot Settings")
+use_pivot_low_t72 = input.bool(true, "Use Pivot Low T72 for Trading", group="Pivot Settings")
+color_pivot_high_t72 = input.color(color.new(color.red, 0), "Pivot High T72 Color", group="Pivot Settings")
+color_pivot_low_t72 = input.color(color.new(color.aqua, 0), "Pivot Low T72 Color", group="Pivot Settings")
+
+// =====================
+// CUSTOM TENKAN SETTINGS
+// =====================
+show_custom_tenkan_1 = input.bool(true, "Show Custom Tenkan 1", group="Custom Tenkan")
+custom_tenkan_1_length = input.int(10, "Custom Tenkan 1 Length", minval=1, group="Custom Tenkan")
+pivot_length_custom_1 = input.int(1, "Custom Tenkan 1 Pivot Length", minval=0, group="Custom Tenkan")
+color_custom_tenkan_1_high = input.color(color.new(color.magenta, 0), "Custom Tenkan 1 High Color", group="Custom Tenkan")
+color_custom_tenkan_1_low = input.color(color.new(color.aqua, 60), "Custom Tenkan 1 Low Color", group="Custom Tenkan")
+
+show_custom_tenkan_2 = input.bool(true, "Show Custom Tenkan 2", group="Custom Tenkan")
+custom_tenkan_2_length = input.int(36, "Custom Tenkan 2 Length", minval=1, group="Custom Tenkan")
+pivot_length_custom_2 = input.int(1, "Custom Tenkan 2 Pivot Length", minval=0, group="Custom Tenkan")
+color_custom_tenkan_2_high = input.color(color.new(color.yellow, 0), "Custom Tenkan 2 High Color", group="Custom Tenkan")
+color_custom_tenkan_2_low = input.color(color.new(color.blue, 60), "Custom Tenkan 2 Low Color", group="Custom Tenkan")
+
+useCustomTenkanLogic = input.bool(true, "Use Custom Tenkan Logic for Trading", group="Custom Tenkan")
+
+// =====================
+// STOCHASTIC PREVIOUS
+// =====================
+useStochPrev = input.bool(true, "Use Stochastic Previous Condition", group="Stochastic Previous")
+stochLookbackRange = input.string("1", "Stochastic Lookback Range", options=["1", "1-2", "1-3", "1-4", "1-5"], group="Stochastic Previous")
+length_prev = input.int(12, "Stochastic Previous Length", minval=1, group="Stochastic Previous")
+smoothK_prev = input.int(1, "Stochastic Previous Smooth K", minval=1, group="Stochastic Previous")
+smoothD_prev = input.int(1, "Stochastic Previous Smooth D", minval=1, group="Stochastic Previous")
+overbought_prev = input.int(60, "Stochastic Previous Overbought", minval=0, maxval=100, group="Stochastic Previous")
+oversold_prev = input.int(40, "Stochastic Previous Oversold", minval=0, maxval=100, group="Stochastic Previous")
+useHAforStochPrev = input.bool(false, "Use Heiken Ashi for Stochastic Previous", group="Stochastic Previous")
+
+useStochT3 = input.bool(false, "Use Stochastic for T3 Pivot Conditions", group="T3 Pivot Stochastic")
+overbought_t3 = input.int(80, "Stochastic T3 Overbought", minval=0, maxval=100, group="T3 Pivot Stochastic")
+oversold_t3 = input.int(20, "Stochastic T3 Oversold", minval=0, maxval=100, group="T3 Pivot Stochastic")
+
+// =====================
+// RISK / TP / SL (USD BASED)
+// =====================
+tpType = input.string("ATR", "Take Profit Type", options=["Fixed", "ATR"], group="Trade Settings")
+tpUSD = input.float(50.0, "Take Profit (USD)", minval=0.1, step=1.0, group="Trade Settings")
+minTPusd = input.float(10.0, "Minimum Take Profit (USD)", minval=0.0, step=0.01, group="Trade Settings")
+tpATrMultiplier = input.float(4.0, "Take Profit ATR Multiplier", minval=0.0, step=0.01, group="Trade Settings")
+
+slType = input.string("ATR", "Stop Loss Type", options=["ATR", "Fixed"], group="Trade Settings")
+slUSD = input.float(30.0, "Stop Loss Distance (USD)", minval=0.1, step=1.0, group="Trade Settings")
+maxSLusd = input.float(50.0, "Maximum Stop Loss (USD)", minval=0.0, step=0.01, group="Trade Settings")
+atrMultiplier = input.float(4.0, "ATR Multiplier", minval=0.1, step=0.1, group="Trade Settings")
+atrLength = input.int(14, "ATR Length", minval=1, group="Trade Settings")
+
+// =====================
+// TENKAN FUNCTION
+// =====================
+f_tenkan(length, src_high, src_low) =>
+    highestHigh = ta.highest(src_high, length)
+    lowestLow = ta.lowest(src_low, length)
+    (highestHigh + lowestLow) / 2
+
+// Calculate Tenkan Lines
+tenkan3 = f_tenkan(3, useHAforPivot ? h : high, useHAforPivot ? l : low)
+tenkan9 = f_tenkan(9, useHAforPivot ? h : high, useHAforPivot ? l : low)
+tenkan12 = f_tenkan(12, useHAforPivot ? h : high, useHAforPivot ? l : low)
+tenkan24 = f_tenkan(24, useHAforPivot ? h : high, useHAforPivot ? l : low)
+tenkan36 = f_tenkan(36, useHAforPivot ? h : high, useHAforPivot ? l : low)
+tenkan72 = f_tenkan(72, useHAforPivot ? h : high, useHAforPivot ? l : low)
+custom_tenkan_1 = f_tenkan(custom_tenkan_1_length, useHAforPivot ? h : high, useHAforPivot ? l : low)
+custom_tenkan_2 = f_tenkan(custom_tenkan_2_length, useHAforPivot ? h : high, useHAforPivot ? l : low)
+
+// =====================
+// PIVOT CALCULATION
+// =====================
+pivot_high_t3 = ta.pivothigh(tenkan3, pivot_length_t3, pivot_length_t3)
+pivot_low_t3 = ta.pivotlow(tenkan3, pivot_length_t3, pivot_length_t3)
+pivot_high_t9 = ta.pivothigh(tenkan9, pivot_length_t9, pivot_length_t9)
+pivot_low_t9 = ta.pivotlow(tenkan9, pivot_length_t9, pivot_length_t9)
+pivot_high_t12 = ta.pivothigh(tenkan12, pivot_length_t12, pivot_length_t12)
+pivot_low_t12 = ta.pivotlow(tenkan12, pivot_length_t12, pivot_length_t12)
+pivot_high_t24 = ta.pivothigh(tenkan24, pivot_length_t24, pivot_length_t24)
+pivot_low_t24 = ta.pivotlow(tenkan24, pivot_length_t24, pivot_length_t24)
+pivot_high_t36 = ta.pivothigh(tenkan36, pivot_length_t36, pivot_length_t36)
+pivot_low_t36 = ta.pivotlow(tenkan36, pivot_length_t36, pivot_length_t36)
+pivot_high_t72 = ta.pivothigh(tenkan72, pivot_length_t72, pivot_length_t72)
+pivot_low_t72 = ta.pivotlow(tenkan72, pivot_length_t72, pivot_length_t72)
+
+pivot_high_custom_1 = ta.pivothigh(custom_tenkan_1, pivot_length_custom_1, pivot_length_custom_1)
+pivot_low_custom_1 = ta.pivotlow(custom_tenkan_1, pivot_length_custom_1, pivot_length_custom_1)
+pivot_high_custom_2 = ta.pivothigh(custom_tenkan_2, pivot_length_custom_2, pivot_length_custom_2)
+pivot_low_custom_2 = ta.pivotlow(custom_tenkan_2, pivot_length_custom_2, pivot_length_custom_2)
+
+// Arrays for latest pivot values
+var float[] pivot_highs_t3 = array.new_float()
+var float[] pivot_lows_t3 = array.new_float()
+var float[] pivot_highs_t9 = array.new_float()
+var float[] pivot_lows_t9 = array.new_float()
+var float[] pivot_highs_t12 = array.new_float()
+var float[] pivot_lows_t12 = array.new_float()
+var float[] pivot_highs_t24 = array.new_float()
+var float[] pivot_lows_t24 = array.new_float()
+var float[] pivot_highs_t36 = array.new_float()
+var float[] pivot_lows_t36 = array.new_float()
+var float[] pivot_highs_t72 = array.new_float()
+var float[] pivot_lows_t72 = array.new_float()
+var float[] pivot_highs_custom_1 = array.new_float()
+var float[] pivot_lows_custom_1 = array.new_float()
+var float[] pivot_highs_custom_2 = array.new_float()
+var float[] pivot_lows_custom_2 = array.new_float()
+
+pushPivot(_arr, _val) =>
+    if not na(_val)
+        array.push(_arr, _val)
+        if array.size(_arr) > 1
+            array.shift(_arr)
+
+pushPivot(pivot_highs_t3, pivot_high_t3)
+pushPivot(pivot_lows_t3, pivot_low_t3)
+pushPivot(pivot_highs_t9, pivot_high_t9)
+pushPivot(pivot_lows_t9, pivot_low_t9)
+pushPivot(pivot_highs_t12, pivot_high_t12)
+pushPivot(pivot_lows_t12, pivot_low_t12)
+pushPivot(pivot_highs_t24, pivot_high_t24)
+pushPivot(pivot_lows_t24, pivot_low_t24)
+pushPivot(pivot_highs_t36, pivot_high_t36)
+pushPivot(pivot_lows_t36, pivot_low_t36)
+pushPivot(pivot_highs_t72, pivot_high_t72)
+pushPivot(pivot_lows_t72, pivot_low_t72)
+pushPivot(pivot_highs_custom_1, pivot_high_custom_1)
+pushPivot(pivot_lows_custom_1, pivot_low_custom_1)
+pushPivot(pivot_highs_custom_2, pivot_high_custom_2)
+pushPivot(pivot_lows_custom_2, pivot_low_custom_2)
+
+pivot_high1_t3 = array.size(pivot_highs_t3) > 0 ? array.get(pivot_highs_t3, 0) : na
+pivot_low1_t3 = array.size(pivot_lows_t3) > 0 ? array.get(pivot_lows_t3, 0) : na
+pivot_high1_t9 = array.size(pivot_highs_t9) > 0 ? array.get(pivot_highs_t9, 0) : na
+pivot_low1_t9 = array.size(pivot_lows_t9) > 0 ? array.get(pivot_lows_t9, 0) : na
+pivot_high1_t12 = array.size(pivot_highs_t12) > 0 ? array.get(pivot_highs_t12, 0) : na
+pivot_low1_t12 = array.size(pivot_lows_t12) > 0 ? array.get(pivot_lows_t12, 0) : na
+pivot_high1_t24 = array.size(pivot_highs_t24) > 0 ? array.get(pivot_highs_t24, 0) : na
+pivot_low1_t24 = array.size(pivot_lows_t24) > 0 ? array.get(pivot_lows_t24, 0) : na
+pivot_high1_t36 = array.size(pivot_highs_t36) > 0 ? array.get(pivot_highs_t36, 0) : na
+pivot_low1_t36 = array.size(pivot_lows_t36) > 0 ? array.get(pivot_lows_t36, 0) : na
+pivot_high1_t72 = array.size(pivot_highs_t72) > 0 ? array.get(pivot_highs_t72, 0) : na
+pivot_low1_t72 = array.size(pivot_lows_t72) > 0 ? array.get(pivot_lows_t72, 0) : na
+pivot_high1_custom_1 = array.size(pivot_highs_custom_1) > 0 ? array.get(pivot_highs_custom_1, 0) : na
+pivot_low1_custom_1 = array.size(pivot_lows_custom_1) > 0 ? array.get(pivot_lows_custom_1, 0) : na
+pivot_high1_custom_2 = array.size(pivot_highs_custom_2) > 0 ? array.get(pivot_highs_custom_2, 0) : na
+pivot_low1_custom_2 = array.size(pivot_lows_custom_2) > 0 ? array.get(pivot_lows_custom_2, 0) : na
+
+selected_pivot_high = switch pivot_period
+    "T3" => pivot_high1_t3
+    "T9" => pivot_high1_t9
+    "T12" => pivot_high1_t12
+    "T24" => pivot_high1_t24
+    "T36" => pivot_high1_t36
+    "T72" => pivot_high1_t72
+
+selected_pivot_low = switch pivot_period
+    "T3" => pivot_low1_t3
+    "T9" => pivot_low1_t9
+    "T12" => pivot_low1_t12
+    "T24" => pivot_low1_t24
+    "T36" => pivot_low1_t36
+    "T72" => pivot_low1_t72
+
+// Plot pivots
+plot(show_pivot_high_t3 ? pivot_high1_t3 : na, "Pivot High T3", color=color_pivot_high_t3, style=plot.style_stepline)
+plot(show_pivot_low_t3 ? pivot_low1_t3 : na, "Pivot Low T3", color=color_pivot_low_t3, style=plot.style_stepline)
+plot(show_pivot_high_t9 ? pivot_high1_t9 : na, "Pivot High T9", color=color_pivot_high_t9, style=plot.style_circles)
+plot(show_pivot_low_t9 ? pivot_low1_t9 : na, "Pivot Low T9", color=color_pivot_low_t9, style=plot.style_circles)
+plot(show_pivot_high_t12 ? pivot_high1_t12 : na, "Pivot High T12", color=color_pivot_high_t12, style=plot.style_stepline)
+plot(show_pivot_low_t12 ? pivot_low1_t12 : na, "Pivot Low T12", color=color_pivot_low_t12, style=plot.style_stepline)
+plot(show_pivot_high_t24 ? pivot_high1_t24 : na, "Pivot High T24", color=color_pivot_high_t24, style=plot.style_stepline)
+plot(show_pivot_low_t24 ? pivot_low1_t24 : na, "Pivot Low T24", color=color_pivot_low_t24, style=plot.style_stepline)
+plot(show_pivot_high_t36 ? pivot_high1_t36 : na, "Pivot High T36", color=color_pivot_high_t36, style=plot.style_circles)
+plot(show_pivot_low_t36 ? pivot_low1_t36 : na, "Pivot Low T36", color=color_pivot_low_t36, style=plot.style_circles)
+plot(show_pivot_high_t72 ? pivot_high1_t72 : na, "Pivot High T72", color=color_pivot_high_t72, style=plot.style_stepline)
+plot(show_pivot_low_t72 ? pivot_low1_t72 : na, "Pivot Low T72", color=color_pivot_low_t72, style=plot.style_stepline)
+
+plot(show_custom_tenkan_1 ? pivot_high1_custom_1 : na, "Custom Tenkan 1 High", color=color_custom_tenkan_1_high, linewidth=2)
+plot(show_custom_tenkan_1 ? pivot_low1_custom_1 : na, "Custom Tenkan 1 Low", color=color_custom_tenkan_1_low, linewidth=2)
+plot(show_custom_tenkan_2 ? pivot_high1_custom_2 : na, "Custom Tenkan 2 High", color=color_custom_tenkan_2_high, linewidth=2)
+plot(show_custom_tenkan_2 ? pivot_low1_custom_2 : na, "Custom Tenkan 2 Low", color=color_custom_tenkan_2_low, linewidth=2)
+
+// =====================
+// STOCHASTIC
+// =====================
+stochSrcPrev = useHAforStochPrev ? heikenashi_1 : syminfo.tickerid
+stoch_close_prev = request.security(stochSrcPrev, timeframe.period, close, lookahead=barmerge.lookahead_off)
+stoch_high_prev = request.security(stochSrcPrev, timeframe.period, high, lookahead=barmerge.lookahead_off)
+stoch_low_prev = request.security(stochSrcPrev, timeframe.period, low, lookahead=barmerge.lookahead_off)
+k_prev = ta.stoch(stoch_close_prev, stoch_high_prev, stoch_low_prev, length_prev)
+d_prev = ta.sma(k_prev, smoothD_prev)
+k_prev := ta.sma(k_prev, smoothK_prev)
+
+f_checkStoch(lookbackRange, overbought, oversold, k, d) =>
+    switch lookbackRange
+        "1" => k[1] < oversold or d[1] < oversold
+        "1-2" => (k[1] < oversold or d[1] < oversold) or (k[2] < oversold or d[2] < oversold)
+        "1-3" => (k[1] < oversold or d[1] < oversold) or (k[2] < oversold or d[2] < oversold) or (k[3] < oversold or d[3] < oversold)
+        "1-4" => (k[1] < oversold or d[1] < oversold) or (k[2] < oversold or d[2] < oversold) or (k[3] < oversold or d[3] < oversold) or (k[4] < oversold or d[4] < oversold)
+        "1-5" => (k[1] < oversold or d[1] < oversold) or (k[2] < oversold or d[2] < oversold) or (k[3] < oversold or d[3] < oversold) or (k[4] < oversold or d[4] < oversold) or (k[5] < oversold or d[5] < oversold)
+
+f_checkStochSell(lookbackRange, overbought, oversold, k, d) =>
+    switch lookbackRange
+        "1" => k[1] > overbought or d[1] > overbought
+        "1-2" => (k[1] > overbought or d[1] > overbought) or (k[2] > overbought or d[2] > overbought)
+        "1-3" => (k[1] > overbought or d[1] > overbought) or (k[2] > overbought or d[2] > overbought) or (k[3] > overbought or d[3] > overbought)
+        "1-4" => (k[1] > overbought or d[1] > overbought) or (k[2] > overbought or d[2] > overbought) or (k[3] > overbought or d[3] > overbought) or (k[4] > overbought or d[4] > overbought)
+        "1-5" => (k[1] > overbought or d[1] > overbought) or (k[2] > overbought or d[2] > overbought) or (k[3] > overbought or d[3] > overbought) or (k[4] > overbought or d[4] > overbought) or (k[5] > overbought or d[5] > overbought)
+
+f_checkStochT3Buy(lookbackRange, overbought, oversold, k, d) =>
+    switch lookbackRange
+        "1" => k[1] < overbought and d[1] < overbought
+        "1-2" => (k[1] < overbought and d[1] < overbought) and (k[2] < overbought and d[2] < overbought)
+        "1-3" => (k[1] < overbought and d[1] < overbought) and (k[2] < overbought and d[2] < overbought) and (k[3] < overbought and d[3] < overbought)
+        "1-4" => (k[1] < overbought and d[1] < overbought) and (k[2] < overbought and d[2] < overbought) and (k[3] < overbought and d[3] < overbought) and (k[4] < overbought and d[4] < overbought)
+        "1-5" => (k[1] < overbought and d[1] < overbought) and (k[2] < overbought and d[2] < overbought) and (k[3] < overbought and d[3] < overbought) and (k[4] < overbought and d[4] < overbought) and (k[5] < overbought and d[5] < overbought)
+
+f_checkStochT3Sell(lookbackRange, overbought, oversold, k, d) =>
+    switch lookbackRange
+        "1" => k[1] > oversold and d[1] > oversold
+        "1-2" => (k[1] > oversold and d[1] > oversold) and (k[2] > oversold and d[2] > oversold)
+        "1-3" => (k[1] > oversold and d[1] > oversold) and (k[2] > oversold and d[2] > oversold) and (k[3] > oversold and d[3] > oversold)
+        "1-4" => (k[1] > oversold and d[1] > oversold) and (k[2] > oversold and d[2] > oversold) and (k[3] > oversold and d[3] > oversold) and (k[4] > oversold and d[4] > oversold)
+        "1-5" => (k[1] > oversold and d[1] > oversold) and (k[2] > oversold and d[2] > oversold) and (k[3] > oversold and d[3] > oversold) and (k[4] > oversold and d[4] > oversold) and (k[5] > oversold and d[5] > oversold)
+
+stochBuyCondition = f_checkStoch(stochLookbackRange, overbought_prev, oversold_prev, k_prev, d_prev)
+stochSellCondition = f_checkStochSell(stochLookbackRange, overbought_prev, oversold_prev, k_prev, d_prev)
+stochT3BuyCondition = f_checkStochT3Buy(stochLookbackRange, overbought_t3, oversold_t3, k_prev, d_prev)
+stochT3SellCondition = f_checkStochT3Sell(stochLookbackRange, overbought_t3, oversold_t3, k_prev, d_prev)
+
+// =====================
+// ATR AND USD/PRICE HELPERS
+// =====================
+atrValue = ta.atr(atrLength)
+
+calcTPpoints(tpMode_in, tpUSD_in, minTP_in, atrMult_in, atrLen_in) =>
+    if tpMode_in == "Fixed"
+        math.max(tpUSD_in / contractSize, minTP_in / contractSize)
+    else
+        math.max(ta.atr(atrLen_in) * atrMult_in, minTP_in / contractSize)
+
+calcSLpoints(slMode_in, slUSD_in, maxSL_in, atrMult_in, atrLen_in) =>
+    if slMode_in == "Fixed"
+        math.min(slUSD_in / contractSize, maxSL_in / contractSize)
+    else
+        math.min(ta.atr(atrLen_in) * atrMult_in, maxSL_in / contractSize)
+
+// =====================
+// TOUCH LOGIC
+// =====================
+sellPivotTouched = (use_pivot_high_t3 and not na(pivot_high1_t3) and high >= pivot_high1_t3 and pivot_high1_t3 >= low and c < c[1]) or
+                  (use_pivot_high_t9 and not na(pivot_high1_t9) and high >= pivot_high1_t9 and pivot_high1_t9 >= low and c < c[1]) or
+                  (use_pivot_high_t12 and not na(pivot_high1_t12) and high >= pivot_high1_t12 and pivot_high1_t12 >= low and c < c[1]) or
+                  (use_pivot_high_t24 and not na(pivot_high1_t24) and high >= pivot_high1_t24 and pivot_high1_t24 >= low and c < c[1]) or
+                  (use_pivot_high_t36 and not na(pivot_high1_t36) and high >= pivot_high1_t36 and pivot_high1_t36 >= low and c < c[1]) or
+                  (use_pivot_high_t72 and not na(pivot_high1_t72) and high >= pivot_high1_t72 and pivot_high1_t72 >= low and c < c[1])
+
+buyPivotTouched = (use_pivot_low_t3 and not na(pivot_low1_t3) and low <= pivot_low1_t3 and pivot_low1_t3 <= high and c > c[1]) or
+                  (use_pivot_low_t9 and not na(pivot_low1_t9) and low <= pivot_low1_t9 and pivot_low1_t9 <= high and c > c[1]) or
+                  (use_pivot_low_t12 and not na(pivot_low1_t12) and low <= pivot_low1_t12 and pivot_low1_t12 <= high and c > c[1]) or
+                  (use_pivot_low_t24 and not na(pivot_low1_t24) and low <= pivot_low1_t24 and pivot_low1_t24 <= high and c > c[1]) or
+                  (use_pivot_low_t36 and not na(pivot_low1_t36) and low <= pivot_low1_t36 and pivot_low1_t36 <= high and c > c[1]) or
+                  (use_pivot_low_t72 and not na(pivot_low1_t72) and low <= pivot_low1_t72 and pivot_low1_t72 <= high and c > c[1])
+
+t3PivotHighTouched = use_pivot_high_t3 and not na(pivot_high1_t3) and high >= pivot_high1_t3 and pivot_high1_t3 >= low
+t3PivotLowTouched = use_pivot_low_t3 and not na(pivot_low1_t3) and low <= pivot_low1_t3 and pivot_low1_t3 <= high
+
+customTenkanBuyCondition = useCustomTenkanLogic and not na(pivot_high1_custom_1) and not na(pivot_low1_custom_2) and pivot_high1_custom_1 < pivot_low1_custom_2
+customTenkanSellCondition = useCustomTenkanLogic and not na(pivot_low1_custom_1) and not na(pivot_high1_custom_2) and pivot_low1_custom_1 > pivot_high1_custom_2
+
+// =====================
+// ENTRY LOGIC
+// =====================
+var float tpPrice = na
+var float slPrice = na
+
+if buyPivotTouched and (not useStochPrev or stochBuyCondition) and c > c[1] and strategy.position_size == 0 and not na(selected_pivot_low) and not na(selected_pivot_high) and selected_pivot_low > selected_pivot_high and customTenkanBuyCondition and (not useStochT3 or not t3PivotHighTouched or (t3PivotHighTouched and stochT3BuyCondition))
+    entryPrice = close
+    tpPrice := entryPrice + calcTPpoints(tpType, tpUSD, minTPusd, tpATrMultiplier, atrLength)
+    slPrice := entryPrice - calcSLpoints(slType, slUSD, maxSLusd, atrMultiplier, atrLength)
+    strategy.entry("Buy", strategy.long, qty=contractSize, comment="Buy at " + str.tostring(entryPrice, "#.##"))
+    strategy.exit("Buy Exit", "Buy", limit=tpPrice, stop=slPrice, comment="Exit at " + str.tostring(tpPrice, "#.##") + " or SL at " + str.tostring(slPrice, "#.##"))
+
+if sellPivotTouched and (not useStochPrev or stochSellCondition) and c < c[1] and strategy.position_size == 0 and not na(selected_pivot_high) and not na(selected_pivot_low) and selected_pivot_high < selected_pivot_low and customTenkanSellCondition and (not useStochT3 or not t3PivotLowTouched or (t3PivotLowTouched and stochT3SellCondition))
+    entryPrice = close
+    tpPrice := entryPrice - calcTPpoints(tpType, tpUSD, minTPusd, tpATrMultiplier, atrLength)
+    slPrice := entryPrice + calcSLpoints(slType, slUSD, maxSLusd, atrMultiplier, atrLength)
+    strategy.entry("Sell", strategy.short, qty=contractSize, comment="Sell at " + str.tostring(entryPrice, "#.##"))
+    strategy.exit("Sell Exit", "Sell", limit=tpPrice, stop=slPrice, comment="Exit at " + str.tostring(tpPrice, "#.##") + " or SL at " + str.tostring(slPrice, "#.##"))
+
+// =====================
+// STATISTICS PERIOD LOGIC
+// =====================
+var int daysBack = 0
+var int startTime = 0
+var int endTime = 0
+statsPeriod = input.string("30 Days", "Statistics Period", options=["1 Day", "2 Days", "3 Days", "4 Days", "5 Days", "6 Days", "7 Days", "8 Days", "9 Days", "10 Days", "11 Days", "12 Days", "13 Days", "14 Days", "15 Days", "16 Days", "17 Days", "18 Days", "19 Days", "20 Days", "21 Days", "22 Days", "23 Days", "24 Days", "25 Days", "26 Days", "27 Days", "28 Days", "29 Days", "30 Days", "All", "Today", "1 Day Ago", "2 Days Ago", "3 Days Ago", "4 Days Ago", "5 Days Ago", "6 Days Ago", "7 Days Ago", "8 Days Ago", "9 Days Ago", "10 Days Ago", "11 Days Ago", "12 Days Ago", "13 Days Ago", "14 Days Ago", "15 Days Ago", "16 Days Ago", "17 Days Ago", "18 Days Ago", "19 Days Ago", "20 Days Ago", "21 Days Ago", "22 Days Ago", "23 Days Ago", "24 Days Ago", "25 Days Ago", "26 Days Ago", "27 Days Ago", "28 Days Ago", "29 Days Ago", "30 Days Ago"], group="Display Settings")
+showStatsTable = input.bool(true, "Show Statistics Table", group="Display Settings")
+statsPosition = input.string("top_right", "Statistics Table Position", options=["top_left", "top_right", "middle_left", "middle_right", "bottom_left", "bottom_right"], group="Display Settings")
+statsTableSize = input.string("small", "Statistics Table Size", options=["tiny", "small", "normal", "large", "huge"], group="Display Settings")
+statsTableTransparency = input.int(100, "Statistics Table Transparency", minval=0, maxval=100, step=10, group="Display Settings")
+
+if statsPeriod == "Today"
+    startTime := timestamp(year(timenow), month(timenow), dayofmonth(timenow), 0, 0)
+    endTime := timenow
+else if statsPeriod == "All"
+    startTime := 0
+    endTime := timenow
+else
+    firstPart = array.size(str.split(statsPeriod, " ")) > 0 ? array.get(str.split(statsPeriod, " "), 0) : "0"
+    daysBack := not na(str.tonumber(firstPart)) ? math.round(str.tonumber(firstPart)) : 0
+    if str.contains(statsPeriod, "Ago")
+        startTime := timestamp(year(timenow), month(timenow), dayofmonth(timenow) - daysBack, 0, 0)
+        endTime := timestamp(year(timenow), month(timenow), dayofmonth(timenow) - daysBack, 23, 59, 59)
+    else
+        startTime := timestamp(year(timenow), month(timenow), dayofmonth(timenow) - daysBack, 0, 0)
+        endTime := timenow
+
+// =====================
+// STATISTICS
+// =====================
+var int winCount = 0
+var int loseCount = 0
+var int breakEvenCount = 0
+var float totalProfitUSD = 0.0
+var float grossProfitUSD = 0.0
+var float grossLossUSD = 0.0
+var float profitFactor = 0.0
+var float winRate = 0.0
+var float maxDrawdown = 0.0
+var float drawdown = 0.0
+var int maxConsecutiveLosses = 0
+var int maxConsecutiveWins = 0
+var float runningBalance = initialCapital
+var float peakBalance = initialCapital
+var int currentLossStreak = 0
+var int currentWinStreak = 0
+var int tempMaxLossStreak = 0
+var int tempMaxWinStreak = 0
+
+if strategy.closedtrades > 0
+    winCount := 0
+    loseCount := 0
+    breakEvenCount := 0
+    totalProfitUSD := 0.0
+    grossProfitUSD := 0.0
+    grossLossUSD := 0.0
+    maxDrawdown := 0.0
+    drawdown := 0.0
+    currentLossStreak := 0
+    currentWinStreak := 0
+    tempMaxLossStreak := 0
+    tempMaxWinStreak := 0
+    runningBalance := initialCapital
+    peakBalance := initialCapital
+    for i = 0 to strategy.closedtrades - 1
+        exitTime = strategy.closedtrades.exit_time(i)
+        if not na(exitTime) and (statsPeriod == "All" ? true : exitTime >= startTime and exitTime <= endTime)
+            profitUSD = strategy.closedtrades.profit(i) * contractSize
+            totalProfitUSD := totalProfitUSD + profitUSD
+            if profitUSD > 0
+                winCount := winCount + 1
+                grossProfitUSD := grossProfitUSD + profitUSD
+                currentLossStreak := 0
+                currentWinStreak := currentWinStreak + 1
+                tempMaxWinStreak := math.max(tempMaxWinStreak, currentWinStreak)
+            else if profitUSD < 0
+                loseCount := loseCount + 1
+                grossLossUSD := grossLossUSD + math.abs(profitUSD)
+                currentLossStreak := currentLossStreak + 1
+                currentWinStreak := 0
+                tempMaxLossStreak := math.max(tempMaxLossStreak, currentLossStreak)
+            else
+                breakEvenCount := breakEvenCount + 1
+            runningBalance := runningBalance + profitUSD
+            peakBalance := math.max(peakBalance, runningBalance)
+            drawdown := (peakBalance - runningBalance) / peakBalance * 100
+            maxDrawdown := math.max(maxDrawdown, drawdown)
+    maxConsecutiveLosses := tempMaxLossStreak
+    maxConsecutiveWins := tempMaxWinStreak
+    profitFactor := grossLossUSD == 0 ? (grossProfitUSD > 0 ? 999.99 : 0) : grossProfitUSD / grossLossUSD
+    totalTrades = winCount + loseCount + breakEvenCount
+    winRate := totalTrades == 0 ? 0 : (winCount / totalTrades) * 100
+profitPercent = (totalProfitUSD / initialCapital) * 100
+
+// =====================
+// TABLE POSITION
+// =====================
+var tablePosition = position.top_right
+switch statsPosition
+    "top_left" => tablePosition := position.top_left
+    "top_right" => tablePosition := position.top_right
+    "middle_left" => tablePosition := position.middle_left
+    "middle_right" => tablePosition := position.middle_right
+    "bottom_left" => tablePosition := position.bottom_left
+    "bottom_right" => tablePosition := position.bottom_right
+
+// =====================
+// DISPLAY STATISTICS TABLE
+// =====================
+var table debugTable = table.new(tablePosition, 2, 15, border_width=1)
+if showStatsTable and barstate.islastconfirmedhistory
+    table.cell(debugTable, 0, 0, "Statistics Period", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 0, statsPeriod, bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 0, 1, "Initial Capital", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 1, str.tostring(initialCapital, "#.##") + " USD", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 0, 2, "Win", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.green, text_size=size.small)
+    table.cell(debugTable, 1, 2, str.tostring(winCount), bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.green, text_size=size.small)
+    table.cell(debugTable, 0, 3, "Lose", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.red, text_size=size.small)
+    table.cell(debugTable, 1, 3, str.tostring(loseCount), bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.red, text_size=size.small)
+    table.cell(debugTable, 0, 4, "Break-even", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.yellow, text_size=size.small)
+    table.cell(debugTable, 1, 4, str.tostring(breakEvenCount), bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.yellow, text_size=size.small)
+    table.cell(debugTable, 0, 5, "Profit (%)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 5, str.tostring(profitPercent, "#.##") + "%", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 0, 6, "Total Profit (USD)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 6, str.tostring(totalProfitUSD, "#.##") + " USD", bgcolor=color.new(color.gray, statsTableTransparency), text_color=totalProfitUSD >= 0 ? color.green : color.red, text_size=size.small)
+    table.cell(debugTable, 0, 7, "Gross Profit (USD)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 7, str.tostring(grossProfitUSD, "#.##") + " USD", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.green, text_size=size.small)
+    table.cell(debugTable, 0, 8, "Gross Loss (USD)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 8, str.tostring(grossLossUSD, "#.##") + " USD", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.red, text_size=size.small)
+    table.cell(debugTable, 0, 9, "Profit Factor", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 9, str.tostring(profitFactor, "#.##"), bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 0, 10, "Win Rate (%)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 10, str.tostring(winRate, "#.##") + "%", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 0, 11, "Drawdown (%)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 11, str.tostring(drawdown, "#.##") + "%", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.red, text_size=size.small)
+    table.cell(debugTable, 0, 12, "Max Drawdown (%)", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 12, str.tostring(maxDrawdown, "#.##") + "%", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.red, text_size=size.small)
+    table.cell(debugTable, 0, 13, "Max Consec. Wins", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 13, str.tostring(maxConsecutiveWins), bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.green, text_size=size.small)
+    table.cell(debugTable, 0, 14, "Max Consec. Losses", bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.white, text_size=size.small)
+    table.cell(debugTable, 1, 14, str.tostring(maxConsecutiveLosses), bgcolor=color.new(color.gray, statsTableTransparency), text_color=color.red, text_size=size.small)
+
